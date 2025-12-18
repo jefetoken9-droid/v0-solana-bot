@@ -1,50 +1,47 @@
-# Diamante Trading Hub
+# Diamante Trading Hub + DMT/SOL Pool Manager
 
-A modern Solana trading platform focused on the Diamante (DMT) token, powered by Jupiter DEX aggregator.
+A modern Solana trading platform focused on the Diamante (DMT) token, powered by Jupiter DEX aggregator. Incluye dashboard de monitoreo y bot de volumen automatizado para el pool DMT/SOL en Raydium.
 
 ## Features
 
 - **Token Swapping**: Trade DMT, SOL, USDC, USDT and more using Jupiter DEX
-- **Real-time Price Data**: Live token prices and 24h statistics from DexScreener
-- **Wallet Integration**: Connect with Phantom, Solflare, and other Solana wallets
-- **Welcome Bonus**: New users receive 5 SOL upon wallet connection
-- **Mainnet Only**: Configured exclusively for Solana mainnet
+- **Pool Dashboard**: Monitor en tiempo real del pool DMT/SOL en Raydium
+- **Volume Bot**: Genera liquidez y volumen automatizado con 3 cuentas
+- **Real-time Price Data**: Live token prices y estadísticas desde DexScreener
+- **Wallet Integration**: Conecta con Phantom, Solflare y otros wallets de Solana
+- **Welcome Bonus**: Nuevos usuarios reciben 5 SOL al conectar wallet
+- **Mainnet Only**: Configurado exclusivamente para Solana mainnet
 
-## Token Information
+## Token & Pool Information
 
 - **Token**: Diamante (DMT)
-- **Address**: `5zJo2GzYRgiZw5j3SBNpuqVcGok35kT3ADwsw74yJWV6`
-- **Pool**: `8oiVbfQT4ErS1wciaTuJhCSn1EuPn37wThA5MypiBq6K`
+- **Address**: `DNtKVnhBub6ikXE782PK64ZUv8GgaAWQyVTgDrEvxUDV`
+- **Pool DMT/SOL**: `8fVcXzRLm2GkDfy2Jw2W79HQGwgVzmi5zwpTfZWj22sr`
+- **Raydium Program**: `AhwM3wt1gvoCxq9jKLSLrgR6kXGSQ2f4Urfx9Ffz9RNt`
+- **Factory**: `7xMJ1iUN8iDqn9yXq8ML4x4gCAq93vXyjUYyrL619MrM`
+- **Config**: `4JWs8ouCxFQog1pXhjFukWMPDPK5oNJ9pYnUTfTD5Gme`
+- **Router**: `7qSHpPJcZojgi74Raf8tWThu387zSE8qMeAW8dJvmSC3`
 - **Network**: Solana Mainnet
 
 ## Setup
 
-1. **Install dependencies**:
+1. **Install dependencies** (local, no contenedor):
    ```bash
-   npm install
+   npm install --legacy-peer-deps
+   npm install @solana/web3.js @solana/spl-token @raydium-io/raydium-sdk yargs
    ```
 
 2. **Configure environment variables**:
-   Copy `.env.example` to `.env.local`:
    ```bash
    cp .env.example .env.local
    ```
 
-   Edit `.env.local` and add:
-   - `NEXT_PUBLIC_SOLANA_RPC_URL`: Your Solana RPC endpoint (optional, defaults to public mainnet)
-   - `BOT_PRIVATE_KEY`: Base58 encoded private key for the airdrop bot wallet (required for airdrop feature)
-
-3. **Fund the bot wallet** (for airdrop functionality):
-   - The bot wallet needs SOL to send airdrops to new users
-   - Send SOL to the bot's public key
-   - Minimum recommended: 100 SOL (for 20 users)
-
-4. **Run the development server**:
+3. **Run development server**:
    ```bash
    npm run dev
    ```
 
-5. **Open the app**:
+4. **Open the app**:
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## Architecture

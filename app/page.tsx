@@ -3,21 +3,50 @@
 import { useWallet, useConnection } from "@solana/wallet-adapter-react"
 import { useState, useEffect } from "react"
 import Header from "@/components/header"
-import TokenSwap from "@/components/token-swap"
-import WalletBalance from "@/components/wallet-balance"
-import AirdropNotification from "@/components/airdrop-notification"
-import DiamanteInfo from "@/components/diamante-info"
-import PriceChart from "@/components/price-chart"
+import PoolDashboard from "@/components/pool-dashboard"
 import { Gem } from "lucide-react"
 
 export default function Home() {
   const wallet = useWallet()
   const { connection } = useConnection()
   const [mounted, setMounted] = useState(false)
+  const [showPool, setShowPool] = useState(true)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="diamond-glow p-8 rounded-2xl">
+          <Gem className="h-12 w-12 text-primary diamond-sparkle" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <Header />
+
+      <main className="container mx-auto px-4 py-8">
+        {showPool ? (
+          <PoolDashboard />
+        ) : (
+          <div className="flex flex-col items-center justify-center min-h-[600px] gap-8">
+            <button
+              onClick={() => setShowPool(true)}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
+            >
+              Ver Dashboard del Pool
+            </button>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
 
   if (!mounted) {
     return (

@@ -33,7 +33,7 @@ export const WSOL = {
 }
 
 // Airdrop amount: 5 WSOL
-export const AIRDROP_AMOUNT = 5 * 1e9 // 5 WSOL in lamports
+export const AIRDROP_AMOUNT = 50 * 1e9 // 50 WSOL in lamports
 
 // Create connection to Solana mainnet
 export const createConnection = () => {
