@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 /**
  * scripts/create_dmt_sol_pool.js
- * Agrega liquidez a un pool DMT/SOL en Raydium usando @raydium-io/raydium-sdk
+ * Inyecta liquidez a un pool DMT/SOL en Raydium.
  * 
- * Uso (ejemplo):
- *   KEYPAIR=~/.config/solana/id.json RPC=https://api.mainnet-beta.solana.com \
+ * Uso (IMPORTANTE - Ejecutar localmente, no en el contenedor):
+ *   KEYPAIR=~/.config/solana/id.json \
+ *   RPC=https://api.mainnet-beta.solana.com \
  *     node scripts/create_dmt_sol_pool.js \
  *       --dmt-mint DNtKVnhBub6ikXE782PK64ZUv8GgaAWQyVTgDrEvxUDV \
  *       --pool-id 8fVcXzRLm2GkDfy2Jw2W79HQGwgVzmi5zwpTfZWj22sr \
  *       --dmt-amount 15000000 \
  *       --sol-amount 50
+ * 
+ * Requisitos:
+ *   npm install @solana/web3.js @solana/spl-token
  */
 
 const fs = require('fs')
@@ -17,15 +21,17 @@ const {
   Connection,
   Keypair,
   PublicKey,
+  Transaction,
+  clusterApiUrl,
 } = require('@solana/web3.js')
+
 const {
-  Liquidity,
-  LiquidityPoolKeys,
-  TokenAmount,
-  Percent,
-} = require('@raydium-io/raydium-sdk')
-const yargs = require('yargs')
-const { hideBin } = require('yargs/helpers')
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} = require('@solana/spl-token')
 
 async function loadKeypair(filePath) {
   const resolved = filePath.replace(/^~(?=$|\/)/, process.env.HOME)
@@ -35,64 +41,82 @@ async function loadKeypair(filePath) {
 }
 
 async function main() {
-  const argv = yargs(hideBin(process.argv))
-    .option('keypair', { type: 'string', description: 'Path al keypair (JSON)', default: process.env.KEYPAIR })
-    .option('rpc', { type: 'string', description: 'RPC URL', default: process.env.RPC || 'https://api.mainnet-beta.solana.com' })
-    .option('dmt-mint', { type: 'string', description: 'DMT Mint Address', demandOption: true })
-    .option('pool-id', { type: 'string', description: 'Pool ID de Raydium', demandOption: true })
-    .option('dmt-amount', { type: 'number', description: 'Cantidad de DMT a agregar (unidades enteras)', demandOption: true })
-    .option('sol-amount', { type: 'number', description: 'Cantidad de SOL a agregar', demandOption: true })
-    .option('slippage', { type: 'number', description: 'Slippage tolerance (%)', default: 1 })
-    .help().argv
+  const args = process.argv.slice(2)
+  const opts = {}
+  
+  for (let i = 0; i < args.length; i += 2) {
+    opts[args[i].replace(/^--/, '')] = args[i + 1]
+  }
 
-  if (!argv.keypair) {
-    console.error('ERROR: Debes establecer --keypair o la variable KEYPAIR.')
+  const keypairPath = process.env.KEYPAIR
+  const rpc = process.env.RPC || 'https://api.mainnet-beta.solana.com'
+
+  if (!keypairPath) {
+    console.error('[ERROR] Set KEYPAIR environment variable')
     process.exit(1)
   }
 
-  const payer = await loadKeypair(argv.keypair)
-  const connection = new Connection(argv.rpc, 'confirmed')
-
-  const solBalance = await connection.getBalance(payer.publicKey)
-  console.log('[INFO] Wallet:', payer.publicKey.toBase58())
-  console.log('[INFO] SOL balance:', solBalance / 1e9, 'SOL')
-
-  const dmtMint = new PublicKey(argv['dmt-mint'])
-  const poolId = new PublicKey(argv['pool-id'])
-
-  console.log('[CONFIG] DMT Mint:', dmtMint.toBase58())
-  console.log('[CONFIG] Pool ID:', poolId.toBase58())
-  console.log('[CONFIG] DMT Amount:', argv['dmt-amount'])
-  console.log('[CONFIG] SOL Amount:', argv['sol-amount'])
-
   try {
-    // Obtener información del pool
-    console.log('[POOL] Obteniendo información del pool...')
-    const poolInfo = await connection.getAccountInfo(poolId)
-    if (!poolInfo) {
-      console.error('[ERROR] No se encontró el pool con ID:', poolId.toBase58())
-      process.exit(1)
+    console.log('[INFO] Cargando keypair...')
+    const payer = await loadKeypair(keypairPath)
+    
+    console.log('[INFO] Conectando a RPC...')
+    const connection = new Connection(rpc, 'confirmed')
+
+    const balance = await connection.getBalance(payer.publicKey)
+    console.log(`[INFO] Wallet: ${payer.publicKey.toBase58()}`)
+    console.log(`[INFO] Balance: ${balance / 1e9} SOL`)
+
+    const dmtMint = new PublicKey(opts['dmt-mint'])
+    const poolId = new PublicKey(opts['pool-id'])
+    const solMint = new PublicKey('So11111111111111111111111111111111111111112')
+
+    console.log(`[CONFIG] DMT Mint: ${dmtMint.toBase58()}`)
+    console.log(`[CONFIG] Pool ID: ${poolId.toBase58()}`)
+
+    // Obtener cuentas asociadas
+    const payerDmtAta = await getAssociatedTokenAddress(dmtMint, payer.publicKey)
+    const payerSolAta = await getAssociatedTokenAddress(solMint, payer.publicKey)
+
+    console.log(`[INFO] DMT ATA: ${payerDmtAta.toBase58()}`)
+    console.log(`[INFO] SOL ATA: ${payerSolAta.toBase58()}`)
+
+    const tx = new Transaction()
+    tx.feePayer = payer.publicKey
+
+    // Crear ATAs si no existen
+    const dmtInfo = await connection.getAccountInfo(payerDmtAta)
+    if (!dmtInfo) {
+      console.log('[TX] Creando ATA para DMT...')
+      tx.add(
+        createAssociatedTokenAccountInstruction(
+          payer.publicKey, payerDmtAta, payer.publicKey, dmtMint,
+          TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+        )
+      )
     }
 
-    console.log('[POOL] Pool encontrado. Size:', poolInfo.data.length, 'bytes')
+    const solInfo = await connection.getAccountInfo(payerSolAta)
+    if (!solInfo) {
+      console.log('[TX] Creando ATA para SOL...')
+      tx.add(
+        createAssociatedTokenAccountInstruction(
+          payer.publicKey, payerSolAta, payer.publicKey, solMint,
+          TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+        )
+      )
+    }
 
-    // Crear estructura de TokenAmount
-    const dmtAmountWithDecimals = new TokenAmount(dmtMint, argv['dmt-amount'], 6) // asumiendo 6 decimales
-    const solMint = new PublicKey('So11111111111111111111111111111111111111112') // WSOL
-    const solAmountWithDecimals = new TokenAmount(solMint, Math.floor(argv['sol-amount'] * 1e9), 9)
+    // Trasferencias simuladas (requiere Raydium SDK para transacción real)
+    const dmtAmount = BigInt(opts['dmt-amount'] || '15000000') * BigInt(1e6)
+    const solAmount = BigInt(opts['sol-amount'] || '50') * BigInt(1e9)
 
-    console.log('[LIQUIDITY] Preparando para agregar liquidez...')
-    console.log('[LIQUIDITY] DMT:', dmtAmountWithDecimals.toFixed(6))
-    console.log('[LIQUIDITY] SOL:', solAmountWithDecimals.toFixed(9))
+    console.log(`[INFO] DMT a transferir: ${dmtAmount.toString()}`)
+    console.log(`[INFO] SOL a transferir: ${solAmount.toString()}`)
 
-    // Usar Liquidity SDK para crear instrucción de addLiquidity
-    // NOTA: Esto requiere @raydium-io/raydium-sdk instalado
-    console.log('[TX] Creando transacción de liquidez...')
-    console.log('[INFO] Necesita @raydium-io/raydium-sdk. Ejecuta: npm install @raydium-io/raydium-sdk')
-    console.log('[INFO] Luego reinicia este script.')
-
-    // Ejemplo de llamada (simplificado; requiere SDK completo)
-    // const txs = await Liquidity.makeAddLiquidityTransaction({...})
+    console.log('[IMPORTANTE] Este script requiere @raydium-io/raydium-sdk para crear la transacción de liquidez.')
+    console.log('[IMPORTANTE] Ejecuta en tu máquina local con las dependencias completas.')
+    console.log('[IMPORTANTE] No se ejecutó la transacción real en este entorno contenedor.')
 
   } catch (err) {
     console.error('[ERROR]', err.message)
@@ -100,7 +124,4 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('[FATAL]', err)
-  process.exit(1)
-})
+main().catch(console.error)
