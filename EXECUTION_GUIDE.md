@@ -31,7 +31,7 @@
 ### Paso 1: Clonar y preparar repo
 
 ```bash
-git clone https://github.com/tu-usuario/v0-solana-bot
+git clone https://github.com/jefetoken9-droid/v0-solana-bot
 cd v0-solana-bot
 
 # Instalar dependencias
